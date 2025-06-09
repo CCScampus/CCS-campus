@@ -1,0 +1,104 @@
+@import url("https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Luxurious+Roman&family=Merienda:wght@300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Mulish:ital,wght@0,200..1000;1,200..1000&family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Orbitron:wght@400..900&family=Quicksand:wght@300..700&family=Raleway:ital,wght@0,100..900;1,100..900&family=Tillana:wght@400;500;600;700;800&family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: "Quicksand", system-ui, sans-serif;
+
+    --background: 0 0% 100%;
+    --foreground: 217 75% 19%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 217 75% 19%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 217 75% 19%;
+
+    --primary: 222 47% 21%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 217 75% 19%;
+
+    --muted: 0 0% 93%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 222 47% 21%;
+    --accent-foreground: 217 75% 19%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 181 80% 40%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+    font-family: 'Quicksand', system-ui, sans-serif;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--card-foreground));
+    font-family: 'Quicksand', system-ui, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Quicksand', system-ui, sans-serif;
+    font-weight: bold;
+  }
+}
+
+/* Additional custom styles */
+.card {
+  background-color: white !important;
+  border: 1px solid hsl(var(--border));
+}
+
+.min-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.min-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--secondary));
+  border-radius: 4px;
+}
+
+.min-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary));
+  border-radius: 4px;
+}
+
+@layer utilities {
+  .animated-bg {
+    @apply relative overflow-hidden;
+  }
+  .animated-bg::before {
+    content: "";
+    @apply absolute inset-0 bg-gradient-to-r from-ccs-dark via-ccs-blue to-ccs-dark bg-[length:200%_100%];
+    animation: gradient 15s linear infinite;
+  }
+  @keyframes gradient {
+    0% {
+      background-position: 0% 0%;
+    }
+    100% {
+      background-position: 200% 0%;
+    }
+  }
+}
