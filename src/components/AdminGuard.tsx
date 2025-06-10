@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AdminGuardProps {
   children: React.ReactNode;
@@ -8,7 +8,7 @@ interface AdminGuardProps {
 
 export default function AdminGuard({ children }: AdminGuardProps) {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, loading: isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== 'admin')) {

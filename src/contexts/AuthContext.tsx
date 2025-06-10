@@ -24,6 +24,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper functions for role storage
+const getUserRoleKey = (userId: string) => `userRole-${userId}`;
+
+const saveUserRole = (userId: string, role: UserRole) => {
+  localStorage.setItem(getUserRoleKey(userId), role);
+};
+
+const getUserRole = (userId: string): UserRole | null => {
+  const role = localStorage.getItem(getUserRoleKey(userId));
+  return role as UserRole | null;
+};
+
+const removeUserRole = (userId: string) => {
+  localStorage.removeItem(getUserRoleKey(userId));
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -47,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Error fetching user role:', error);
         // Clear any role data if we can't verify
-        sessionStorage.removeItem(`userRole-${authUser.id}`);
+        removeUserRole(authUser.id);
         setUser(null);
         await supabase.auth.signOut();
         return;
@@ -72,24 +88,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // Check if sessionStorage role matches database role
-      const storedRole = sessionStorage.getItem(`userRole-${authUser.id}`) as UserRole | null;
+      // Check if stored role matches database role
+      const storedRole = getUserRole(authUser.id);
       if (storedRole && storedRole !== appRole) {
         // Role mismatch, clear the invalid stored role
         console.warn('Stored role does not match database role, clearing session');
-        sessionStorage.removeItem(`userRole-${authUser.id}`);
+        removeUserRole(authUser.id);
         setUser(null);
         await supabase.auth.signOut();
         return;
       }
       
       // Store the correct role for future use with unique key per user
-      sessionStorage.setItem(`userRole-${authUser.id}`, appRole);
+      saveUserRole(authUser.id, appRole);
       setUser({ ...authUser, role: appRole, displayName });
     } catch (error) {
       console.error('Error in updateUserWithRole:', error);
       if (authUser?.id) {
-        sessionStorage.removeItem(`userRole-${authUser.id}`);
+        removeUserRole(authUser.id);
       }
       setUser(null);
       await supabase.auth.signOut();
@@ -165,8 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
       
-      // Store user role in session storage with unique key per user
-      sessionStorage.setItem(`userRole-${data.user.id}`, appRole);
+      // Store user role in localStorage with unique key per user
+      saveUserRole(data.user.id, appRole);
       
       // Get current user and update with role immediately
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -187,9 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Clear role from session storage if user exists
+    // Clear role from localStorage if user exists
     if (user?.id) {
-      sessionStorage.removeItem(`userRole-${user.id}`);
+      removeUserRole(user.id);
     }
     await supabase.auth.signOut();
   };

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { UserRole } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
@@ -108,18 +109,42 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
   // Check for any issues with session on component mount
   useEffect(() => {
-    // We only need to clean up any legacy localStorage entries
-    // as we've moved to sessionStorage with user-specific keys
-    const hasLegacyLocalStorageSession = localStorage.getItem('userRole') !== null;
+    const checkAndFixAuthSession = async () => {
+      try {
+        // Check if we have a valid session
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          // Clear any invalid auth data
+          await supabase.auth.signOut();
+          localStorage.removeItem('supabase.auth.token');
+          
+          if (error.message.includes('Invalid Refresh Token')) {
+            toast({
+              title: "Session Expired",
+              description: "Your session has expired. Please log in again.",
+              variant: "destructive",
+            });
+          }
+        }
+        
+        // Clear any legacy localStorage entries
+        const hasLegacyLocalStorageSession = localStorage.getItem('userRole') !== null;
+        
+        if (hasLegacyLocalStorageSession) {
+          // Clear any legacy data
+          localStorage.removeItem('userRole');
+        }
+      } catch (err) {
+        console.error('Error checking auth session:', err);
+      } finally {
+        setInitialCheckComplete(true);
+      }
+    };
     
-    if (hasLegacyLocalStorageSession) {
-      // Clear any legacy data
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('supabase.auth.token');
-    }
-    
-    setInitialCheckComplete(true);
-  }, []);
+    checkAndFixAuthSession();
+  }, [toast]);
 
   if (loading || !initialCheckComplete) {
     return (
