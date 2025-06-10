@@ -171,20 +171,20 @@ const TeacherManagementPage = () => {
     }
     console.log('Deleting teacher with user_id:', userId);
     try {
-      // Try direct delete from the database instead of using Edge Function
-      // First delete from auth (requires admin privileges)
-      console.log('Attempting to delete teacher with user ID:', userId);
-      
-      // This is a simplified approach - may not work if RLS policies are strict
-      const { error } = await supabase
-        .from('teachers')
-        .delete()
-        .eq('id', userId);
-      
-      if (error) {
-        console.error('Error deleting teacher from database:', error);
-        toast.error('Failed to delete teacher. Please contact administrator.');
-        return;
+      // Use the edge function to delete the teacher with admin privileges
+      const response = await fetch('https://rmhfbsmtmlsjvzvallkv.supabase.co/functions/v1/teacher-management', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabase.supabaseKey,
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete teacher');
       }
       
       toast.success('Teacher deleted successfully!');

@@ -189,10 +189,65 @@ serve(async (req: Request) => {
       }
     }
 
-    // Handle DELETE with dummy success responses for now
-    return new Response(JSON.stringify({ success: true, message: 'Operation completed successfully' }), {
+    // Handle DELETE request to delete a teacher
+    if (method === 'DELETE') {
+      console.log('Deleting a teacher...');
+      
+      try {
+        // Parse request body
+        const requestData = await req.json();
+        const { userId } = requestData;
+        
+        if (!userId) {
+          return new Response(JSON.stringify({ 
+            error: 'Missing required field: userId is required' 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          });
+        }
+        
+        // First delete the user from auth.users (this will cascade to teachers and profiles)
+        console.log('Deleting user from auth with ID:', userId);
+        try {
+          const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+          
+          if (deleteError) {
+            console.error('Error deleting user from auth:', deleteError);
+            return new Response(JSON.stringify({ error: deleteError.message }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500,
+            });
+          }
+          
+          console.log('User deleted successfully');
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: 'Teacher deleted successfully'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        } catch (authError) {
+          console.error('Unexpected error when deleting auth user:', authError);
+          return new Response(JSON.stringify({ error: 'Failed to delete user account' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          });
+        }
+      } catch (requestError) {
+        console.error('Error parsing request body:', requestError);
+        return new Response(JSON.stringify({ error: 'Invalid request format' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
+    }
+
+    // Remove the dummy success response and return a 405 Method Not Allowed for unsupported methods
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 405,
     });
   } catch (error) {
     console.error('An error occurred:', error);
