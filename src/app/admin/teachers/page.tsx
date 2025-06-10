@@ -57,6 +57,7 @@ const TeacherManagementPage = () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabase.supabaseKey,
         }
       });
       
@@ -114,7 +115,7 @@ const TeacherManagementPage = () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': supabase.supabaseKey, // Add the anon key as well
+          'apikey': supabase.supabaseKey,
         },
         body: JSON.stringify({ 
           name: newTeacherName, 
@@ -126,6 +127,14 @@ const TeacherManagementPage = () => {
       if (!response.ok) {
         // If direct fetch fails, try the original approach
         console.error('Direct fetch failed with status:', response.status);
+        
+        // Try to get more details about the error
+        try {
+          const errorData = await response.json();
+          console.error('Error details:', errorData);
+        } catch (jsonError) {
+          console.error('Could not parse error response:', jsonError);
+        }
         
         const { data, error } = await supabase.functions.invoke('teacher-management', {
           method: 'POST',
