@@ -18,16 +18,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Download, FileDown, Receipt, Send } from "lucide-react";
 import { Student, Fee, Payment } from "@/types";
 import { getStudentById } from '@/services/studentService';
 import { getStudentFees } from '@/services/feesService';
 import StudentFeeManager from "@/components/StudentFeeManager";
 import { generateFeeDetailsPDF, generateReceiptPDF } from "@/lib/pdf-generator";
-import { generateReminderEmailContent } from "@/lib/email-templates";
-import { useReminderEmail } from "@/hooks/use-reminder-email";
+import { sendFeeReminderEmail } from '@/lib/email-service';
 
 const StudentFees = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,10 +32,8 @@ const StudentFees = () => {
   const [feeRecords, setFeeRecords] = useState<(Fee & { student: Student })[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const [emailSubject, setEmailSubject] = useState("");
-  const [emailContent, setEmailContent] = useState("");
   const [selectedFee, setSelectedFee] = useState<(Fee & { student: Student }) | null>(null);
-  const { sendReminderEmail, reminderSending } = useReminderEmail(selectedFee);
+  const [reminderSending, setReminderSending] = useState(false);
 
   useEffect(() => {
     const fetchStudentData = async () => {
@@ -134,15 +129,32 @@ const StudentFees = () => {
   // Handle reminder email
   const prepareReminderEmail = (fee: Fee & { student: Student }) => {
     setSelectedFee(fee);
-    if (fee.dueAmount > 0) {
-      const { subject, content } = generateReminderEmailContent(fee);
-      setEmailSubject(subject);
-      setEmailContent(content);
-    }
   };
 
   const handleSendReminder = async () => {
-    await sendReminderEmail(emailSubject, emailContent);
+    if (!selectedFee) return;
+    
+    setReminderSending(true);
+    
+    try {
+      // Send email using EmailJS
+      const result = await sendFeeReminderEmail(selectedFee);
+      
+      toast({
+        title: result.success ? "Success" : "Error",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send reminder. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setReminderSending(false);
+    }
   };
 
   if (loading) {
@@ -216,28 +228,13 @@ const StudentFees = () => {
                         To: {student.email || "Email not available"}
                       </p>
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Subject:</p>
-                      <Input
-                        value={emailSubject}
-                        onChange={(e) => setEmailSubject(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Message:</p>
-                      <Textarea
-                        rows={8}
-                        value={emailContent}
-                        onChange={(e) => setEmailContent(e.target.value)}
-                      />
-                    </div>
                   </div>
                   <DialogFooter>
                     <Button
                       onClick={handleSendReminder}
                       disabled={reminderSending || !student.email}
                     >
-                      {reminderSending ? "Sending..." : "Send Email"}
+                      {reminderSending ? "Sending..." : "Send Reminder"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>

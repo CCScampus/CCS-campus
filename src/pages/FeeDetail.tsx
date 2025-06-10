@@ -27,8 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import {
   ArrowLeft,
@@ -42,8 +40,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Student, Fee, Payment } from "@/types";
 import { generateReceiptPDF, generateFeeDetailsPDF } from "@/lib/pdf-generator";
-import { generateReminderEmailContent } from "@/lib/email-templates";
-import { useReminderEmail } from "@/hooks/use-reminder-email";
+import { sendFeeReminderEmail } from '@/lib/email-service';
 
 const FeeDetail = () => {
   // State and hooks
@@ -51,10 +48,7 @@ const FeeDetail = () => {
   const { toast } = useToast();
   const [fee, setFee] = useState<(Fee & { student: Student }) | null>(null);
   const [loading, setLoading] = useState(true);
-  const [emailSubject, setEmailSubject] = useState("");
-  const [emailContent, setEmailContent] = useState("");
-
-  const { sendReminderEmail, reminderSending } = useReminderEmail(fee);
+  const [reminderSending, setReminderSending] = useState(false);
 
   // Fetch fee details
   useEffect(() => {
@@ -101,15 +95,10 @@ const FeeDetail = () => {
             reference: payment.reference_number || "",
             slipURL: payment.slip_url || "",
           })),
+          graceMonth: data.grace_month || 1,
+          graceFeeAmount: data.grace_fee_amount || 500,
         };
         setFee(mappedFee);
-
-        // Pre-fill reminder email
-        if (mappedFee.dueAmount > 0) {
-          const { subject, content } = generateReminderEmailContent(mappedFee);
-          setEmailSubject(subject);
-          setEmailContent(content);
-        }
       } catch (error) {
         console.error("Error fetching fee details:", error);
         toast({
@@ -161,7 +150,29 @@ const FeeDetail = () => {
 
   // Handle reminder email
   const handleSendReminder = async () => {
-    await sendReminderEmail(emailSubject, emailContent);
+    if (!fee) return;
+    
+    setReminderSending(true);
+    
+    try {
+      // Send email using EmailJS
+      const result = await sendFeeReminderEmail(fee);
+      
+      toast({
+        title: result.success ? "Success" : "Error",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send reminder. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setReminderSending(false);
+    }
   };
 
   if (loading) {
@@ -239,28 +250,13 @@ const FeeDetail = () => {
                       To: {fee.student.email || "Email not available"}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Subject:</p>
-                    <Input
-                      value={emailSubject}
-                      onChange={(e) => setEmailSubject(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Message:</p>
-                    <Textarea
-                      rows={8}
-                      value={emailContent}
-                      onChange={(e) => setEmailContent(e.target.value)}
-                    />
-                  </div>
                 </div>
                 <DialogFooter>
                   <Button
                     onClick={handleSendReminder}
                     disabled={reminderSending || !fee.student.email}
                   >
-                    {reminderSending ? "Sending..." : "Send Email"}
+                    {reminderSending ? "Sending..." : "Send Reminder"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -318,6 +314,9 @@ const FeeDetail = () => {
         <Card>
           <CardHeader>
             <CardTitle>Fee Details</CardTitle>
+            <CardDescription>
+              {fee.student.name} ({fee.student.rollNo}) - {fee.student.course}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -339,33 +338,34 @@ const FeeDetail = () => {
                   ₹{fee.dueAmount.toLocaleString()}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Due Date</p>
-                <p className="font-medium flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  {format(new Date(fee.dueDate), "PP")}
-                </p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-muted-foreground">Status</p>
-                <Badge
-                  variant={
-                    fee.status === "paid"
-                      ? "default"
-                      : fee.status === "partially_paid"
-                      ? "secondary"
-                      : "destructive"
-                  }
-                  className="mt-1"
-                >
-                  {fee.status.replace("_", " ")}
-                </Badge>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium">Due Date</p>
+                  <p className="text-lg">
+                    {format(new Date(fee.dueDate), "PPP")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Status</p>
+                  <Badge
+                    variant={
+                      fee.status === "paid"
+                        ? "success"
+                        : fee.status === "partially_paid"
+                        ? "warning"
+                        : "destructive"
+                    }
+                  >
+                    {fee.status.replace("_", " ")}
+                  </Badge>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Payment History Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">

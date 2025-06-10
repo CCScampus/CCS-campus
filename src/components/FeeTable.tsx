@@ -27,6 +27,8 @@ import {
 import { Search, Filter, MoreHorizontal, Download, FileText, Mail, Plus } from "lucide-react";
 import { Student, Fee } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { sendFeeReminderEmail } from '@/lib/email-service';
 
 interface FeeTableProps {
   fees: Array<Fee & { student: Student } | { student: Student, noFeeRecord: true }>;
@@ -38,6 +40,7 @@ const FeeTable = ({ fees, loading, onAddPayment }: FeeTableProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [courseFilter, setCourseFilter] = useState("all_courses");
   const [statusFilter, setStatusFilter] = useState("all_statuses");
+  const { toast } = useToast();
 
   const getUniqueValues = (key: keyof Student) => {
     return Array.from(new Set(fees.map(fee => 'student' in fee ? fee.student[key] : fee.student[key])))
@@ -67,6 +70,56 @@ const FeeTable = ({ fees, loading, onAddPayment }: FeeTableProps) => {
     const studentB = 'student' in b ? b.student : b.student;
     return studentA.name.localeCompare(studentB.name);
   });
+
+  // Function to handle email reminder from dropdown
+  const handleSendReminderFromDropdown = async (student: Student, fee?: Fee) => {
+    if (!student.email) {
+      toast({
+        title: "Error",
+        description: "Student email address is missing. Cannot send reminder.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // If no fee record exists, create a dummy one with all required fields
+      const feeToUse = fee || {
+        dueAmount: 0,
+        dueDate: new Date().toISOString(),
+        totalAmount: 0,
+        paidAmount: 0,
+        status: 'unpaid' as const,
+        studentId: student.id,
+        id: 'temp-id',
+        payments: [],
+        graceMonth: 1,
+        graceFeeAmount: 500
+      };
+      
+      // Combine fee and student data
+      const feeWithStudent = { 
+        ...feeToUse, 
+        student 
+      };
+      
+      // Send email using EmailJS
+      const result = await sendFeeReminderEmail(feeWithStudent);
+      
+      toast({
+        title: result.success ? "Success" : "Error",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send reminder. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -227,14 +280,15 @@ const FeeTable = ({ fees, loading, onAddPayment }: FeeTableProps) => {
                             </>
                           )}
                           {student.email && (
-                            <DropdownMenuItem asChild>
-                              <a 
-                                href={`mailto:${student.email}?subject=Fee Reminder`}
-                                className="cursor-pointer"
-                              >
-                                <Mail className="mr-2 h-4 w-4" />
-                                Send Reminder
-                              </a>
+                            <DropdownMenuItem
+                              onClick={() => handleSendReminderFromDropdown(
+                                student, 
+                                hasFeeRecord ? (item as Fee) : undefined
+                              )}
+                              className="cursor-pointer"
+                            >
+                              <Mail className="mr-2 h-4 w-4" />
+                              Send Reminder
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
