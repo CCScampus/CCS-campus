@@ -208,22 +208,25 @@ export const updateDailyAttendance = async (
         reason: h.reason || null,
       }));
 
-      // Only include id if it's a valid UUID and not a temporary id
-      const isValidId = record.id && typeof record.id === 'string' && 
-                       record.id.length === 36 && !record.id.startsWith('temp-');
-      
       // Find the existing record for version check
       const existingRecord = (existingRecords as DatabaseAttendanceRecord[] || [])
         .find(r => r.student_id === record.studentId);
       
       // Prepare record with versioning for concurrency control
       const recordToUpsert: any = {
-        ...(isValidId ? { id: record.id } : {}), // Only include id if it's valid
         student_id: record.studentId,
         date: record.date,
         hourly_status,
         version: (record.version || 0) + 1
       };
+
+      // If we have an existing record, use its ID
+      if (existingRecord) {
+        recordToUpsert.id = existingRecord.id;
+      } else {
+        // For new records, generate a new UUID
+        recordToUpsert.id = uuidv4();
+      }
       
       // Handle potential concurrency conflicts
       if (existingRecord && existingRecord.version !== undefined) {
